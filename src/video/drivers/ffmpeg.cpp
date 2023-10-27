@@ -80,8 +80,6 @@ std::string FfmpegFmtToString(const AVPixelFormat fmt)
     TEST_PIX_FMT_RETURN(YUVJ420P);
     TEST_PIX_FMT_RETURN(YUVJ422P);
     TEST_PIX_FMT_RETURN(YUVJ444P);
-    TEST_PIX_FMT_RETURN(XVMC_MPEG2_MC);
-    TEST_PIX_FMT_RETURN(XVMC_MPEG2_IDCT);
     TEST_PIX_FMT_RETURN(UYVY422);
     TEST_PIX_FMT_RETURN(UYYVYY411);
     TEST_PIX_FMT_RETURN(BGR8);
@@ -101,11 +99,7 @@ std::string FfmpegFmtToString(const AVPixelFormat fmt)
     TEST_PIX_FMT_RETURN(YUV440P);
     TEST_PIX_FMT_RETURN(YUVJ440P);
     TEST_PIX_FMT_RETURN(YUVA420P);
-    TEST_PIX_FMT_RETURN(VDPAU_H264);
-    TEST_PIX_FMT_RETURN(VDPAU_MPEG1);
-    TEST_PIX_FMT_RETURN(VDPAU_MPEG2);
-    TEST_PIX_FMT_RETURN(VDPAU_WMV3);
-    TEST_PIX_FMT_RETURN(VDPAU_VC1);
+    TEST_PIX_FMT_RETURN(VDPAU);
     TEST_PIX_FMT_RETURN(RGB48BE );
     TEST_PIX_FMT_RETURN(RGB48LE );
     TEST_PIX_FMT_RETURN(RGB565BE);
@@ -516,7 +510,7 @@ static AVStream* CreateStream(AVFormatContext *oc, CodecID codec_id, uint64_t fr
     
     /* Some formats want stream headers to be separate. */
     if (oc->oformat->flags & AVFMT_GLOBALHEADER)
-        stream->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+        stream->codec->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
     
     /* open the codec */
     int ret = avcodec_open2(stream->codec, codec, NULL);
@@ -578,16 +572,6 @@ void FfmpegVideoOutputStream::WriteFrame(AVFrame* frame)
     int ret;
     int got_packet = 1;
 
-    // Setup AVPacket
-    if (recorder.oc->oformat->flags & AVFMT_RAWPICTURE) {
-        /* Raw video case - directly store the picture in the packet */
-        pkt.flags        |= AV_PKT_FLAG_KEY;
-        pkt.data          = frame->data[0];
-        pkt.size          = sizeof(AVPicture);
-        pkt.pts           = frame->pts;
-        ret = 0;
-    } else {
-        /* encode the image */
 #if (LIBAVFORMAT_VERSION_MAJOR >= 54)
         ret = avcodec_encode_video2(stream->codec, &pkt, frame, &got_packet);
 #else
@@ -602,7 +586,7 @@ void FfmpegVideoOutputStream::WriteFrame(AVFrame* frame)
         got_packet = ret > 0;
 #endif
         if (ret < 0) throw VideoException("Error encoding video frame");
-    }
+    
     
     if (ret >= 0 && got_packet) {
         WriteAvPacket(&pkt);
